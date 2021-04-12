@@ -1,5 +1,0 @@
-class MainTests {
-  def testGetAllUniqueLinks() = {
-
-  }
-}
