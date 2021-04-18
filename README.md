@@ -6,6 +6,9 @@ But it's simple & works ;)
 
 "IntelliJ Web Server" = Press html file in intellij, choose the popup in upper right corner "open in browser".
 
+Simply run either from inside IntelliJ or via `run` in a `sbt`-shell. On my computer it runs ~20s and downloads all of tretton37 (including crawling & large MP4 files).  
+The `\r` trick does not seem to work well in `sbt-shell`.
+
 **Architecture**
 - `Main.scala` this is where the magic happens.
   1. Fetch & Save Index
@@ -14,12 +17,14 @@ But it's simple & works ;)
     - Clean html & fetch all links that hasn't been fetched
     - Repeat
   4. Shut down once there's no more new links
-- `LinkValidator.scala` this object validates if link should be crawled
+- `LinkHandler.scala` this object validates if link should be crawled and fetches all assets links inside a html-document
 - `HtmlCleaner.scala` this object cleans html doc to make the asset paths look better
   - Removes cache path (`X.css?{hash}`)
   - Relativize path (e.g. `../asset`, `asset`)
     - Because intellij built-in web server does not work with `/asset`.
   - Adds `.html` to "internal" html links to also be able to traverse them in IntelliJ's web server
+- `FileHandler.scala` this object takes the url & byte-content (post-cleaning) and saves to file-system at the correct location.
+- `ResponseData.scala` is a `case class` that makes the code a little cleaner
 
 **Known Issues**
 - There's a few href/src inside the CSS that I have been to lazy to fix.

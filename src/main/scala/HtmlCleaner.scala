@@ -9,7 +9,7 @@ object HtmlCleaner {
     val parentLevel = "../".repeat(link.replace(Main.indexUrl, "").count(_ == '/'))
     val noCacheHtml = fileCacheRegex.replaceAllIn(htmlDoc, "")
     val fixedHtmlFileEnding = htmlAssetRegex.replaceAllIn(noCacheHtml, "$1=\"$2.html\"")
-    val fixedAssetsHtml = rootCacheRegex.replaceAllIn(fixedHtmlFileEnding, "\""+parentLevel+"$1")
+    val fixedAssetsHtml = rootCacheRegex.replaceAllIn(fixedHtmlFileEnding, "\"" + parentLevel + "$1")
     fixedAssetsHtml.replace("\"/.html\"", "\"index.html\"").getBytes()
   }
 }

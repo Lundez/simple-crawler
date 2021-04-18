@@ -2,22 +2,34 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should
 
 class AllTests extends AnyFlatSpec with should.Matchers {
-  "LinkValidator" should "validate valid internal links" in {
-    LinkValidator.isAssetToDownload("/assets/v/video.mp4") shouldBe true
-    LinkValidator.isAssetToDownload("assets/v/video.mp4") shouldBe true
-    LinkValidator.isAssetToDownload("assets/i/img.jpg") shouldBe true
-    LinkValidator.isAssetToDownload("page") shouldBe true
-    LinkValidator.isAssetToDownload("page.html") shouldBe true
+  "LinkHandler" should "validate valid internal links" in {
+    LinkHandler.isAssetToDownload("/assets/v/video.mp4") shouldBe true
+    LinkHandler.isAssetToDownload("assets/v/video.mp4") shouldBe true
+    LinkHandler.isAssetToDownload("assets/i/img.jpg") shouldBe true
+    LinkHandler.isAssetToDownload("page") shouldBe true
+    LinkHandler.isAssetToDownload("page.html") shouldBe true
   }
   it should "invalidate links that is not to download" in {
-    LinkValidator.isAssetToDownload("https://google.com/assets/v/video.mp4") shouldBe false
-    LinkValidator.isAssetToDownload("/cdn...") shouldBe false
-    LinkValidator.isAssetToDownload("//cdn") shouldBe false
-    LinkValidator.isAssetToDownload("page#hello") shouldBe false
-    LinkValidator.isAssetToDownload("tel:+46318") shouldBe false
-    LinkValidator.isAssetToDownload("mailto:hampus@gmail.com") shouldBe false
-    LinkValidator.isAssetToDownload("javascript:void(0)") shouldBe false
-    LinkValidator.isAssetToDownload("asset/{filename}") shouldBe false
+    LinkHandler.isAssetToDownload("https://google.com/assets/v/video.mp4") shouldBe false
+    LinkHandler.isAssetToDownload("/cdn...") shouldBe false
+    LinkHandler.isAssetToDownload("//cdn") shouldBe false
+    LinkHandler.isAssetToDownload("page#hello") shouldBe false
+    LinkHandler.isAssetToDownload("tel:+46318") shouldBe false
+    LinkHandler.isAssetToDownload("mailto:hampus@gmail.com") shouldBe false
+    LinkHandler.isAssetToDownload("javascript:void(0)") shouldBe false
+    LinkHandler.isAssetToDownload("asset/{filename}") shouldBe false
+  }
+
+  it should "correctly make raw link" in {
+    LinkHandler.toRawAssetLink("https://londogard.com") shouldBe None
+    LinkHandler.toRawAssetLink("random#hej") shouldBe None
+    LinkHandler.toRawAssetLink("../hej") shouldBe Some("https://tretton37.com/hej")
+    LinkHandler.toRawAssetLink("glad man") shouldBe Some("https://tretton37.com/glad%20man")
+    LinkHandler.toRawAssetLink("name.css?039ika") shouldBe Some("https://tretton37.com/name.css")
+  }
+
+  it should "fetch all unique links" in {
+    LinkHandler.retrieveAllUniqueAssetLinks("hello main.css but src=\"hej.css\" with href=\"global/site/blog\"") shouldBe Set("https://tretton37.com/hej.css", "https://tretton37.com/global/site/blog")
   }
 
   "HtmlCleaner" should "relativize file correctly for intellij to serve html" in {

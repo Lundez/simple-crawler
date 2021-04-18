@@ -1,17 +1,14 @@
-import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+import scala.jdk.CollectionConverters._
 import scala.util.Try
-import scala.util.matching.Regex
 
 object Main {
   val indexUrl = "https://tretton37.com/"
   private var numFetches = 0
   private var numCompletedFetches = 0
-  private val regexPath: Regex = "(src|href)=\"/?(.*?)\"".r
-  private val rootPath: Path = Paths.get("tretton37")
   private val concurrentMap = new ConcurrentHashMap[String, Boolean]()
 
   def main(args: Array[String]): Unit = {
@@ -23,7 +20,7 @@ object Main {
       .foreach(msg => println(s"\nPotential Errors: $msg"))
 
     println(s"Took ${(System.currentTimeMillis() - time) / 1e3} s")
-    println(s"Files exists in $rootPath (works best to view through IntelliJ + open in browser)")
+    println(s"Files exists in ${FileHandler.rootPath.toAbsolutePath} (works best to view through IntelliJ + open in browser)")
   }
 
   private def isHtmlContent(contentType: String): Boolean = contentType.contains("html")
@@ -33,59 +30,33 @@ object Main {
       .map { link =>
         numFetches += 1
         printToLog(s"Fetching $link")
+
         Future(requests.get(link))
           .map { resp => numCompletedFetches += 1; printToLog(s"Got response from ${resp.url}"); resp }
           .map {
+            case response if response.url == indexUrl =>
+              ResponseData("index.html", HtmlCleaner.cleanHtmlDoc(response.text(), link), getAllUniqueLinks(response.text()))
             case response if response.contentType.exists(isHtmlContent) =>
-              val url = response.url.stripPrefix(indexUrl)
-              ResponseData(s"${if (url.isEmpty) "index" else url}.html", HtmlCleaner.cleanHtmlDoc(response.text(), link), getAllUniqueLinks(response.text()))
+              ResponseData(s"${response.url.stripPrefix(indexUrl)}.html", HtmlCleaner.cleanHtmlDoc(response.text(), link), getAllUniqueLinks(response.text()))
             case response =>
               ResponseData(response.url.stripPrefix(indexUrl), response.bytes, Seq.empty)
           }
           .flatMap { responseData =>
-            val path = urlToPath(responseData.filename)
-            saveFile(path, responseData.cleanedFileData)
-            makeParallellRequests(responseData.internalLinks)
+            Future(FileHandler.saveFile(responseData.filename, responseData.cleanedFileData))
+              .zip(makeParallellRequests(responseData.internalLinks))
+              .map { case (_, units) => units.headOption }
           }
       }
     Future.sequence(allRequests).map(_.flatten)
   }
 
-  private def urlToPath(url: String): Path = {
-    val filename = url.stripPrefix(indexUrl).split('?').head.replace("%20", " ")
-    val filenameWithSuffix = if (filename.contains('.')) filename else s"$filename.html"
-    rootPath.resolve(filenameWithSuffix)
-  }
-
-  private def saveFile(path: Path, response: Array[Byte]): Path = {
-    Files.createDirectories(path.getParent)
-    Files.write(path, response)
-  }
-
-  private def getFilePath(assetLink: String): Option[String] = {
-    if (LinkValidator.isAssetToDownload(assetLink)) {
-      Some(assetLink
-        .stripPrefix("/")
-        .replace("../", "")
-        .replace(" ", "%20")
-        .split('?').head
-      )
-    } else None
-  }
-
   private def getAllUniqueLinks(htmlDoc: String): Seq[String] = {
-    val paths = regexPath
-      .findAllMatchIn(htmlDoc).toSeq
-      .map(_.group(2))
-      .flatMap(getFilePath)
-      .filterNot(_.isBlank)
-      .map(asset => s"$indexUrl$asset")
+    val paths = LinkHandler.retrieveAllUniqueAssetLinks(htmlDoc)
       .filterNot(concurrentMap.containsKey)
-      .distinct
 
-    paths.foreach(concurrentMap.put(_, false))
+    concurrentMap.putAll(paths.map(_ -> false).toMap.asJava)
 
-    paths
+    paths.toSeq
   }
 
   private def printToLog(message: String): Unit = print(s"\r($numCompletedFetches/$numFetches) $message")
